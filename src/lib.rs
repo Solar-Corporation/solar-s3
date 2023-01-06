@@ -1,3 +1,6 @@
+#![feature(io_error_more)]
+#![allow(unused)]
+
 mod storage;
 
 use std::collections::hash_map::DefaultHasher;
