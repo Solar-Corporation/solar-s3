@@ -1,8 +1,14 @@
 use std::path::Path;
 
-use rusqlite::{Connection, Result};
+use rusqlite::{Connection, Result, Transaction};
 
-pub struct BucketDB {}
+pub struct KeyPath {
+	pub key: String,
+	pub path: String,
+	pub is_dir: bool,
+}
+
+pub struct BucketDB;
 
 impl BucketDB {
 	pub async fn init(bucket_path: impl AsRef<Path>) -> Result<()> {
@@ -34,6 +40,19 @@ impl BucketDB {
 	}
 	
 	pub async fn open(path: impl AsRef<Path>) -> Result<Connection> {
+		let path = Path::new(path.as_ref()).join("user-paths.sqlite");
 		return Ok(Connection::open(path)?);
+	}
+	
+	pub async fn add_key(key: KeyPath, transaction: &Transaction<'_>) -> Result<()> {
+		transaction.execute("INSERT INTO paths (hash, path, is_dir) VALUES (?1, ?2, ?3);", (key.key, key.path, key.is_dir as i8));
+		return Ok(());
+	}
+	
+	pub async fn get_path(key: &str, transaction: &Transaction<'_>) -> Result<String> {
+		transaction.query_row("SELECT path FROM paths WHERE hash = ?1",
+		                      [key], |row| {
+				row.get(0)
+			})
 	}
 }
