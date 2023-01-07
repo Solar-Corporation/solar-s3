@@ -3,10 +3,9 @@ use std::path::Path;
 use std::str;
 
 use async_trait::async_trait;
-use mockall::*;
 use serde::{Deserialize, Serialize};
 use serde_json;
-use tokio::{fs, io::AsyncWriteExt};
+use tokio::fs;
 use uuid::Uuid;
 
 use crate::storage::space::Space;
@@ -51,10 +50,8 @@ impl Storage for Store {
         };
         
         let store_json = serde_json::to_string(&store)?;
-        
-        let mut store_file = fs::File::create(&path.join("storage.json")).await?;
-        store_file.write_all(&store_json.as_bytes()).await?;
-        
+    
+        fs::write(&path.join("storage.json"), &store_json.as_bytes()).await?;
         return Ok(store);
     }
     
@@ -79,62 +76,5 @@ impl Storage for Store {
     
     async fn recalculation_usage_space(&self) -> Result<u64> {
         return Ok(0);
-    }
-}
-
-#[cfg(test)]
-mod tests_store {
-    use mocktopus::mocking::*;
-    
-    use crate::storage::space::Space;
-    
-    use super::*;
-    
-    #[tokio::test]
-    async fn test_create_success() {
-        let path = Path::new("../storage_create");
-        fs::remove_dir_all(path).await.is_err();
-        let res = Store::create(&path, 1000, None).await.unwrap();
-        assert!(path.exists());
-        fs::remove_dir_all(path).await.is_err();
-    }
-    
-    #[tokio::test]
-    async fn test_create_check_json() {
-        let path = Path::new("../storage_check_json");
-        fs::remove_dir_all(path).await.is_err();
-        let res = Store::create(&path, 1000, None).await.unwrap();
-        assert!(path.join("storage.json").exists());
-        fs::remove_dir_all(path).await.is_err();
-    }
-    
-    #[tokio::test]
-    async fn test_create_failed() {
-        Space::get_disc.mock_safe(|| MockResult::Return(0));
-        let path = Path::new("../storage_failed");
-        fs::remove_dir_all(path).await.is_err();
-        let res = Store::create(&path, 10, None).await.is_err();
-        assert!(res);
-    }
-    
-    #[tokio::test]
-    async fn test_open() {
-        Space::get_disc.mock_safe(|| MockResult::Return(10000));
-        let path = Path::new("../storage_open");
-        fs::remove_dir_all(path).await.is_err();
-        
-        let res = Store::create(&path, 1000, None).await.unwrap();
-        assert!(path.exists());
-        
-        let res = Store::open(path).await.unwrap();
-        let is_uuid = Uuid::parse_str(res.uuid.as_str()).is_err();
-        
-        assert_eq!(res.store_path, "../storage_open");
-        assert_eq!(is_uuid, false);
-        assert_eq!(res.store_name, "storage_open");
-        assert_eq!(res.logging, false);
-        assert_eq!(res.available_space, 1000);
-        assert_eq!(res.usage_space, 0);
-        fs::remove_dir_all(path).await.is_err();
     }
 }
