@@ -18,6 +18,9 @@ impl Space {
 			let mut total_size = 0;
 			let mut dir = fs::read_dir(dir_path).await.unwrap();
 			while let Some(item) = dir.next_entry().await.unwrap() {
+				if (item.file_name().to_str().unwrap() == "user-paths.sqlite") {
+					continue;
+				}
 				if item.metadata().await.unwrap().is_dir() {
 					total_size += Space::dir_size(&item.path()).await;
 					continue;

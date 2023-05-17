@@ -10,7 +10,7 @@ use uuid::Uuid;
 
 use crate::storage::space::Space;
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct Store {
     pub uuid: String,
     pub store_path: String,
@@ -24,6 +24,7 @@ pub struct Store {
 pub trait Storage {
     async fn create(path: impl AsRef<Path>, available_space: u64, logging: Option<bool>) -> Result<Store>;
     async fn open(path: impl AsRef<Path>) -> Result<Store>;
+    async fn update_space(&mut self, add_size: u64) -> Result<u64>;
     async fn restore(&self) -> Result<Store>;
     async fn recalculation_usage_space(&self) -> Result<u64>;
 }
@@ -36,10 +37,10 @@ impl Storage for Store {
         if free_size <= 0 {
             return Err(Error::new(ErrorKind::StorageFull, "There is no free space to initialize the Storage!"));
         }
-        
+
         let path = Path::new(path.as_ref());
         fs::create_dir(&path).await?;
-        
+
         let store = Store {
             uuid: Uuid::new_v4().to_string(),
             store_path: path.to_str().unwrap().to_string(),
@@ -48,13 +49,13 @@ impl Storage for Store {
             usage_space: 0,
             logging: logging.unwrap_or(false),
         };
-        
+
         let store_json = serde_json::to_string(&store)?;
-    
         fs::write(&path.join("storage.json"), &store_json.as_bytes()).await?;
+
         return Ok(store);
     }
-    
+
     async fn open(path: impl AsRef<Path>) -> Result<Store> {
         let path = Path::new(path.as_ref()).join("storage.json");
         let file = fs::read(&path).await?;
@@ -62,7 +63,22 @@ impl Storage for Store {
         let storage: Store = serde_json::from_str(json_str)?;
         return Ok(storage);
     }
-    
+
+    async fn update_space(&mut self, add_size: u64) -> Result<u64> {
+        let new_size = self.usage_space + add_size;
+        if new_size > self.available_space {
+            return Err(Error::new(ErrorKind::StorageFull, "There is no free space to update!"));
+        }
+
+        self.usage_space = new_size;
+        let path = Path::new(&self.store_path).join("storage.json");
+
+        let store_json = serde_json::to_string(&self)?;
+        fs::write(&path, &store_json.as_bytes()).await?;
+
+        return Ok(new_size);
+    }
+
     async fn restore(&self) -> Result<Store> {
         return Ok(Store {
             uuid: "".to_string(),
@@ -73,7 +89,7 @@ impl Storage for Store {
             logging: false,
         });
     }
-    
+
     async fn recalculation_usage_space(&self) -> Result<u64> {
         return Ok(0);
     }
