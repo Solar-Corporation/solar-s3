@@ -2,6 +2,8 @@
 name = "solar-s3"
 version = "0.1.0"
 edition = "2021"
+description = "Solar-s3 this is the first version of the package that allows you to work with the file system as with S3 storage."
+license = "MIT"
 
 [dependencies]
 futures = "0.3.25"
